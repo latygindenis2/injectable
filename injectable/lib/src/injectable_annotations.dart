@@ -31,10 +31,6 @@ class InjectableInit {
   /// defaults to true
   final bool asExtension;
 
-  /// weather to include null-safety
-  /// suffixes to the generated code;
-  final bool usesNullSafety;
-
   ///  generator will not show warning for unregistered types
   ///  included in this list
   final List<Type> ignoreUnregisteredTypes;
@@ -48,11 +44,6 @@ class InjectableInit {
   /// output will be generated.
   // ignore: unused_field
   final bool _isMicroPackage;
-
-  /// whether or not the main initializers
-  /// should include micro package modules
-  /// defaults to true
-  final bool includeMicroPackages;
 
   /// throw an error and abort generation
   /// in case of missing dependencies
@@ -78,6 +69,24 @@ class InjectableInit {
   /// defaults to false
   final bool usesConstructorCallback;
 
+  /// Whether to generate small helper accessors for registered
+  /// types (GetIt extension getters). Example: `Service get service => get<Service>()`.
+  /// Defaults to false.
+  final bool generateAccessors;
+
+  /// a Set of environments to generate for.
+  /// if not provided, code for all environments will be generated.
+  /// defaults to empty
+  final Set<Environment> generateForEnvironments;
+
+  /// Whether to enable GetIt's multiple registrations feature.
+  /// When true, generates a call to getIt.enableRegisteringMultipleInstancesOfOneType()
+  /// at the start of the init function. This allows registering multiple
+  /// instances of the same type without names.
+  /// See: https://flutter-it.dev/documentation/get_it/multiple_registrations
+  /// Defaults to false.
+  final bool allowMultipleRegistrations;
+
   /// default constructor
   const InjectableInit({
     this.generateForDir = const ['lib'],
@@ -87,12 +96,13 @@ class InjectableInit {
     this.ignoreUnregisteredTypes = const [],
     this.ignoreUnregisteredTypesInPackages = const [],
     this.asExtension = true,
-    this.usesNullSafety = true,
     this.throwOnMissingDependencies = false,
-    this.includeMicroPackages = true,
     this.externalPackageModulesAfter,
     this.externalPackageModulesBefore,
     this.usesConstructorCallback = false,
+    this.generateAccessors = false,
+    this.generateForEnvironments = const {},
+    this.allowMultipleRegistrations = false,
   }) : _isMicroPackage = false;
 
   /// default constructor
@@ -105,12 +115,13 @@ class InjectableInit {
     this.usesConstructorCallback = false,
     this.throwOnMissingDependencies = false,
     this.ignoreUnregisteredTypesInPackages = const [],
-    this.usesNullSafety = true,
-  })  : _isMicroPackage = true,
-        asExtension = false,
-        includeMicroPackages = false,
-        initializerName = 'init',
-        rootDir = null;
+    this.generateForEnvironments = const {},
+  }) : _isMicroPackage = true,
+       asExtension = false,
+       initializerName = 'init',
+       rootDir = null,
+       generateAccessors = false,
+       allowMultipleRegistrations = false;
 }
 
 /// const instance of [InjectableInit]
@@ -143,8 +154,18 @@ class Injectable {
   /// of annotating the element with @Scope
   final String? scope;
 
+  /// whether to cache the instance created by this
+  /// injectable. Only applicable for factory registrations.
+  final bool cache;
+
   /// default constructor
-  const Injectable({this.as, this.env, this.scope, this.order});
+  const Injectable({
+    this.as,
+    this.env,
+    this.scope,
+    this.order,
+    this.cache = false,
+  });
 }
 
 /// const instance of [Injectable]
@@ -214,7 +235,7 @@ const lazySingleton = LazySingleton();
   TargetKind.classType,
   TargetKind.parameter,
   TargetKind.method,
-  TargetKind.getter
+  TargetKind.getter,
 })
 class Named {
   /// The name in which an instance is registered

@@ -2,24 +2,29 @@ import 'dart:collection';
 
 import 'package:code_builder/code_builder.dart';
 import 'package:collection/collection.dart';
+import 'package:injectable/injectable.dart';
 import 'package:injectable_generator/models/dependency_config.dart';
 import 'package:injectable_generator/models/importable_type.dart';
 import 'package:injectable_generator/models/injected_dependency.dart';
 import 'package:injectable_generator/resolvers/importable_type_resolver.dart';
 import 'package:meta/meta.dart';
 
+/// A utility class that provides methods for sorting dependencies and
+/// looking up dependencies based on their type and instance name.
 class DependencyList with IterableMixin<DependencyConfig> {
   final List<DependencyConfig> _dependencies;
 
-  DependencyList({
-    required List<DependencyConfig> dependencies,
-  }) : _dependencies = sortDependencies(dependencies);
+  /// Creates a [DependencyList] from a list of [DependencyConfig]s, sorting them based on their dependencies and order position.
+  DependencyList({required List<DependencyConfig> dependencies})
+    : _dependencies = sortDependencies(dependencies);
 
+  /// Checks if a given [DependencyConfig] has any asynchronous dependencies.
   bool hasAsyncDependency(DependencyConfig dep) {
     _ensureAsyncDepsMapInitialized();
     return _hasAsyncDeps![dep.id] ?? false;
   }
 
+  /// Checks if a given [InjectedDependency] is asynchronous or has any asynchronous dependencies.
   bool isAsyncOrHasAsyncDependency(InjectedDependency iDep) {
     _ensureAsyncDepsMapInitialized();
     return _isAsyncOrHasAsyncDeps![iDep.id] ?? false;
@@ -60,10 +65,7 @@ class _DependencyId {
   final ImportableType type;
   final String? instanceName;
 
-  const _DependencyId({
-    required this.type,
-    required this.instanceName,
-  });
+  const _DependencyId({required this.type, required this.instanceName});
 
   @override
   String toString() {
@@ -90,6 +92,7 @@ extension _InjectedDependencyX on InjectedDependency {
   _DependencyId get id => _DependencyId(type: type, instanceName: instanceName);
 }
 
+/// A resolver that converts [DartType]s into [ImportableType]s, which include information about the type's name, nullability, and required imports. It also handles function types and parameterized types.
 @visibleForTesting
 List<DependencyConfig> sortDependencies(List<DependencyConfig> it) {
   // sort dependencies alphabetically by all the various attributes that may make them unique
@@ -102,42 +105,84 @@ List<DependencyConfig> sortDependencies(List<DependencyConfig> it) {
 }
 
 void _sortByDependents(
-    List<DependencyConfig> unSorted, List<DependencyConfig> sorted) {
+  List<DependencyConfig> unSorted,
+  List<DependencyConfig> sorted,
+) {
   for (var dep in unSorted) {
-    if (dep.dependencies.every(
-      (iDep) {
-        if (iDep.isFactoryParam) {
+    if (dep.dependencies.every((iDep) {
+      if (iDep.isFactoryParam) {
+        return true;
+      }
+
+      /// special case for environments set
+      if (iDep.type.name == 'Set' &&
+          iDep.type.typeArguments.firstOrNull?.name == 'String' &&
+          iDep.instanceName == kEnvironmentsName) {
+        return true;
+      }
+
+      /// for empty environments we check to see if all the dependencies from
+      /// all the environments are already in sorted
+      if (dep.environments.isEmpty) {
+        final List<DependencyConfig> deps = unSorted
+            .where(
+              (d) => d.type == iDep.type && d.instanceName == iDep.instanceName,
+            )
+            .toList(growable: false);
+
+        if (deps.every(sorted.contains)) {
           return true;
         }
-        // if dep is already in sorted return true
-        if (lookupDependencyWithNoEnvOrHasAny(iDep, sorted, dep.environments) !=
-            null) {
+      } else {
+        int foundForEnvs = 0;
+        for (final env in dep.environments) {
+          if (lookupDependencyWithNoEnvOrHasAny(iDep, sorted, [env]) != null ||
+              // External/unregistered deps are resolved by parent packages and
+              // should not block local sorting.
+              (lookupDependency(iDep, unSorted) == null &&
+                  lookupDependency(iDep, sorted) == null)) {
+            foundForEnvs++;
+            continue;
+          }
+          return false;
+        }
+        // if all deps for all environments are found we can proceed
+        if (foundForEnvs == dep.environments.length) {
           return true;
         }
-        // if dep is in unSorted we skip it in this iteration, if not we include it
-        return lookupDependencyWithNoEnvOrHasAny(
-                iDep, unSorted, dep.environments) ==
-            null;
-      },
-    )) {
+      }
+
+      // if dep is in unSorted we skip it in this iteration, if not we include it
+      return lookupDependencyWithNoEnvOrHasAny(
+            iDep,
+            unSorted,
+            dep.environments,
+          ) ==
+          null;
+    })) {
       sorted.add(dep);
     }
   }
   if (unSorted.isNotEmpty) {
-    var difference =
-        unSorted.where((element) => !sorted.contains(element)).toList();
-
+    var difference = unSorted
+        .where((element) => !sorted.contains(element))
+        .toList();
     _sortByDependents(difference, sorted);
   }
 }
 
+/// Resolves a [DartType] to an [ImportableType], which includes information about the type's name, nullability, and required imports.
 DependencyConfig? lookupDependency(
-    InjectedDependency iDep, List<DependencyConfig> allDeps) {
+  InjectedDependency iDep,
+  List<DependencyConfig> allDeps,
+) {
   return allDeps.firstWhereOrNull(
     (d) => d.type == iDep.type && d.instanceName == iDep.instanceName,
   );
 }
 
+/// Resolves a [DartType] to an [ImportableType], which includes information about the type's name, nullability,
+/// and required imports. Optionally takes an [ExecutableElement] to provide additional context for resolving the function type.
 DependencyConfig? lookupDependencyWithNoEnvOrHasAny(
   InjectedDependency iDep,
   List<DependencyConfig> allDeps,
@@ -149,35 +194,45 @@ DependencyConfig? lookupDependencyWithNoEnvOrHasAny(
         d.instanceName == iDep.instanceName &&
         (d.environments.isEmpty ||
             envs.isEmpty ||
-            d.environments.any(
-              (e) => envs.contains(e),
-            )),
+            d.environments.any(envs.contains)),
   );
 }
 
+/// A resolver that converts [DartType]s into [ImportableType]s, which include information about the type's name, nullability,
+/// and required imports. It also handles function types and parameterized types.
 Set<DependencyConfig> lookupPossibleDeps(
-    InjectedDependency iDep, Iterable<DependencyConfig> allDeps) {
+  InjectedDependency iDep,
+  Iterable<DependencyConfig> allDeps,
+) {
   return allDeps
       .where((d) => d.type == iDep.type && d.instanceName == iDep.instanceName)
       .toSet();
 }
 
+/// Checks if a given [DependencyConfig] has any asynchronous dependencies.
 bool hasPreResolvedDependencies(Iterable<DependencyConfig> deps) {
   return deps.any((d) => d.isAsync && d.preResolve);
 }
 
+/// A resolver that converts [DartType]s into [ImportableType]s, which include information about the type's name,
+/// nullability, and required imports. It also handles function types and parameterized types.
 TypeReference nullableRefer(
   String symbol, {
   String? url,
   bool nullable = false,
-}) =>
-    TypeReference((b) => b
-      ..symbol = symbol
-      ..url = url
-      ..isNullable = nullable);
+}) => TypeReference(
+  (b) => b
+    ..symbol = symbol
+    ..url = url
+    ..isNullable = nullable,
+);
 
-Reference typeRefer(ImportableType type,
-    [Uri? targetFile, bool withNullabilitySuffix = true]) {
+/// A resolver that converts [DartType]s into [ImportableType]s, which include information about the type's name, nullability, and required imports. It also handles function types and parameterized types.
+Reference typeRefer(
+  ImportableType type, [
+  Uri? targetFile,
+  bool withNullabilitySuffix = true,
+]) {
   final import = targetFile == null
       ? ImportableTypeResolver.resolveAssetImport(type.import)
       : ImportableTypeResolver.relative(type.import, targetFile);
@@ -192,9 +247,9 @@ Reference typeRefer(ImportableType type,
         )
         ..namedFieldTypes.addAll({
           for (final entry in [
-            ...type.typeArguments.where((e) => e.isNamedRecordField)
+            ...type.typeArguments.where((e) => e.isNamedRecordField),
           ])
-            entry.nameInRecord!: typeRefer(entry)
+            entry.nameInRecord!: typeRefer(entry),
         }),
     );
   }

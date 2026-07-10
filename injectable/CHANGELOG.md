@@ -1,4 +1,33 @@
 # ChangeLog
+## [3.0.0]
+- Breaking: Removed `includeMicroPackages` option. Micro packages must now be explicitly registered using `externalPackageModulesBefore` and `externalPackageModulesAfter` in `@InjectableInit`.
+- Breaking: Removed deprecated `usesNullSafety` option. Null safety is now always assumed.
+- Feat: Add support for multiple registrations via `allowMultipleRegistrations` (#535, #531).
+- Fix: Treat external dependencies as non-blocking in environment sorting (#539, Fixes #532).
+## [2.7.1+4]
+- Docs: fix a typo in readme
+## [2.7.1+3]
+- Docs: update docs to include lean_builder support
+## [2.7.1+2]
+- Fix: fix coverage badge alignment in readme
+## [2.7.1+1]
+- Chore: add test coverage badge to readme
+## [2.7.1]
+- Feat: Add `generateAccessors` option to `@InjectableInit` annotation for generating GetIt extension getters
+- Feat: Improve dependency sorting logic
+- Feat: Add test coverage reporting
+- Feat: Add comprehensive test suite for better code quality
+## [2.7.0]
+- Feat: Add support to cached factories introduced in get_it 8.0.0
+- Chore: update get_it constraint to 8.3.0 <= 10.0.0
+## [2.6.0]
+- Chore: update get_it constraint to 7.2.0 < 10.0.0
+## [2.5.2]
+- Update dart constrains to ">=3.8.0 <4.0.0"
+## [2.5.1]
+- Feat: handle and pass on exception for async scope initialization
+- Feat: Add generateForEnvironments option
+- Fix: Add missing dispose param to getIt.registerSingleton when preResolve is true
 ## [2.5.0]
 - Chore: update get_it constraint to 7.2.0 <= 9.0.0
 - Fix: scope annotation does not work with getters
@@ -47,9 +76,9 @@ Fix: add generic type annotation to registerSingleton() call #436
 - Add support for manual dependencies ordering thanks to @casvanluijtelaar
 - Add support for GetIt scopes
 - Add @PostConstruct annotation to execute sync/async code after construction
-- Add preResolve to @FactoryMethod annotation              
+- Add preResolve to @FactoryMethod annotation
 - Add throwOnMissingDependencies flag to @InjectableInit annotation
-- Change asExtension default value to true [breaking change] 
+- Change asExtension default value to true [breaking change]
 - Change initializerName default value to 'init' [breaking change]
 ## [1.5.3]
 - Sync injectable and injectable_generator with GetIt v7.2.0 to generate non-nullable @factoryParams
@@ -58,7 +87,7 @@ Fix: add generic type annotation to registerSingleton() call #436
 Use getAsync for async injected dependencies, fixes #230
 Add support for function factory params, fixes #224
 Update analyzer version #228
-Add ignore types in packages support 
+Add ignore types in packages support
 Fix some readme typos
 ## [1.4.1]
 - Pomp up build_runner version to 2.0.3
@@ -68,13 +97,13 @@ Fix some readme typos
 - Pomp up build_runner version to 2.0.2
 ## [1.3.0]
 - Include merge that fixes #194
-- Pomp up versions of build_runner -> 2.0.1, code_builder -> 4.0.0, analyzer -> 1.5.0 
+- Pomp up versions of build_runner -> 2.0.1, code_builder -> 4.0.0, analyzer -> 1.5.0
 ## [1.2.2]
 - Fix generator crash after 1.2.1 update
 - Add option to ignore missing type warning for specified types
 ## [1.2.1]
 - Pomp up versions of build, build_runner, dart_style and source_gen
-- Fix named instances are ignored when sorting dependencies. 
+- Fix named instances are ignored when sorting dependencies.
 - Clean up some code
 ## [1.2.0]
 - Push nullSafety version to the main section
@@ -114,7 +143,7 @@ Fix some readme typos
 - Change generated file applies to most of effective dart rules including preferring relative imports
 - Clean up some code
 
-## [0.4.0+1] 
+## [0.4.0+1]
 - Update README file
 - Add some comments
 ## [0.4.0] Breaking Changes!
@@ -126,7 +155,7 @@ Fix some readme typos
 - Add generateForDir property to @InjectableInt to specify what directories to generate for.
 - Fix imports issue when working with bin directory
 
- 
+
 ## [0.3.0] Breaking Changes!
 - add support for GetIt 4.0.0
 - fix generic types are registered as dynamic

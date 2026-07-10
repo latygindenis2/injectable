@@ -5,6 +5,9 @@ align="center" src="https://img.shields.io/badge/License-MIT-green" alt="MIT Lic
 <a href="https://github.com/Milad-Akarie/injectable/stargazers"><img align="center" src="https://img.shields.io/github/stars/Milad-Akarie/injectable?style=flat&logo=github&colorB=green&label=stars" alt="stars"></a>      
 <a href="https://pub.dev/packages/injectable"><img     
 align="center" src="https://img.shields.io/pub/v/injectable.svg?" alt="pub version"></a>      
+<a href="https://codecov.io/github/Milad-Akarie/injectable" > 
+ <img align="center" src="https://codecov.io/github/Milad-Akarie/injectable/graph/badge.svg?token=G4KCD379JJ"/> 
+ </a>
 <a href="https://www.buymeacoffee.com/miladakarie" target="_blank"><img align="center" src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="30px" width= "108px"></a>    
 <p >  
   
@@ -13,8 +16,10 @@ align="center" src="https://img.shields.io/pub/v/injectable.svg?" alt="pub versi
 - [Installation](#installation)
 - [Setup](#setup)
 - [Registering factories](#registering-factories)
+- [Generating Accessor Methods](#generating-accessor-methods)
 - [Registering singletons](#registering-singletons)
 - [Disposing of singletons](#disposing-of-singletons)
+- [Multiple Registrations](#multiple-registrations)
 - [FactoryMethod and PostConstruct Annotations](#factorymethod-and-postconstruct-annotations)
 - [Registering asynchronous injectables](#registering-asynchronous-injectables)
 - [Pre-Resolving futures](#pre-resolving-futures)
@@ -31,18 +36,55 @@ align="center" src="https://img.shields.io/pub/v/injectable.svg?" alt="pub versi
 ## Installation
 
 ```yaml  
-dependencies:  
+dependencies:
   # add injectable to your dependencies  
-  injectable:  
+  injectable:
   # add get_it  
-  get_it:  
-  
-dev_dependencies:  
+  get_it:
+
+dev_dependencies:
   # add the generator to your dev_dependencies  
-  injectable_generator:  
+  injectable_generator:
   # add build runner if not already added  
   build_runner:  
 ```  
+
+## LeanBuilder support (Experimental) ⚡
+
+injectable_generator (2.12.0+) now supports [LeanBuilder](https://pub.dev/packages/lean_builder) for super-fast incremental builds.
+
+To use lean_builder instead of build_runner, simply add it to your dev_dependencies:
+
+```yaml
+dev_dependencies:
+  injectable_generator: <latest-version>
+  lean_builder: <latest-version>
+```
+
+and then run the builder using:
+
+For one-time build:
+```terminal
+dart run lean_builder build
+```
+
+For watching files and rebuilding on changes:
+```terminal
+dart run lean_builder watch
+```
+
+To disable `injectable_generator` from using build_runner, you can add the following to your `build.yaml` file:
+
+```yaml
+targets:
+  $default:
+    builders:
+      injectable_generator:injectable_builder:
+        enabled: false
+      injectable_generator:injectable_config_builder:
+        enabled: false
+```
+
 
 ## Setup
   
@@ -52,7 +94,7 @@ dev_dependencies:
 2. Define a top-level function (lets call it configureDependencies) then annotate it with @injectableInit.
 3. Import the **Generated** dart file created later on in the code. This will follow the name of the file with the `@InjectableInit` annotated func, eg `file_name.config.dart`.
 4. Call the **Generated** extension func getIt.init(), or your custom initializer name inside your configure func.
-	
+
 Note: This example is for version 2+
 
 
@@ -65,6 +107,7 @@ final getIt = GetIt.instance;
   initializerName: 'init', // default  
   preferRelativeImports: true, // default  
   asExtension: true, // default  
+  generateAccessors: false, // default  
 )  
 void configureDependencies() => getIt.init();  
 ```  
@@ -105,6 +148,17 @@ class ServiceB {
   
 ```  
 
+### Cached Factories
+To register cached factories pass true to the `cache` property inside of the `@Injectable` annotation.
+
+```dart
+
+@Injectable(cache: true)
+class ServiceA {}
+  
+```
+to read more about cached factories check the [GetIt docs](https://flutter-it.dev/documentation/get_it/object_registration#cached-factories)
+
 ### Run the generator
 
 Use the [watch] flag to watch the files' system for edits and rebuild as necessary.
@@ -119,30 +173,117 @@ if you want the generator to run one time and exits use
 flutter packages pub run build_runner build  
 ```  
 
+
 ### Inside of the generated file
 
 Injectable will generate the needed register functions for you.
 
 ```dart  
-import 'package:get_it/get_it.dart' as _i1;  
-  
-extension GetItInjectableX on _i1.GetIt {  
+import 'package:get_it/get_it.dart' as _i1;
+
+extension GetItInjectableX on _i1.GetIt {
   /// initializes the registration of main-scope dependencies inside of [GetIt]  
-  Future<_i1.GetIt> init({  
-    String? environment,  
-    _i2.EnvironmentFilter? environmentFilter,  
-  }) async {  
-    final gh = _i2.GetItHelper(  
-      this,  
-      environment,  
-      environmentFilter,  
-    );  
-    gh.factory<ServiceA>(() => ServiceA());  
-    gh.factory<ServiceB>(ServiceA(getIt<ServiceA>()));  
-    return this;  
-  }  
+  Future<_i1.GetIt> init({
+    String? environment,
+    _i2.EnvironmentFilter? environmentFilter,
+  }) async {
+    final gh = _i2.GetItHelper(
+      this,
+      environment,
+      environmentFilter,
+    );
+    gh.factory<ServiceA>(() => ServiceA());
+    gh.factory<ServiceB>(ServiceA(getIt<ServiceA>()));
+    return this;
+  }
 }  
 ```  
+
+## Generating Accessor Methods
+
+---
+
+By default, dependencies are accessed using `getIt.get<Type>()`. However, you can enable the [generateAccessors](#generating-accessor-methods) property in `@InjectableInit` to generate convenient accessor methods that provide a cleaner, more concise API.
+
+### Enabling Accessor Generation
+
+Simply set `generateAccessors: true` in your `@InjectableInit` annotation:
+
+```dart
+@InjectableInit(generateAccessors: true)
+void configureDependencies() => getIt.init();
+```
+
+### Simple Type Access
+
+Without `generateAccessors`, you use the standard GetIt syntax:
+
+```dart
+// Without generateAccessors
+var userService = getIt.get<UserService>();
+var database = getIt.get<Database>();
+```
+
+With `generateAccessors: true`, the generator creates convenient getter methods:
+
+```dart
+// With generateAccessors: true
+var userService = getIt.userService;
+var database = getIt.database;
+```
+
+The generator automatically converts type names to camelCase for the accessor names (`UserService` → `userService`).
+
+### Parameterized Dependencies
+
+For dependencies that accept parameters (factory parameters or instance names), accessor methods are generated with those same parameters:
+
+**Without `generateAccessors`:**
+
+```dart
+@injectable
+class UserRepository {
+  UserRepository(@factoryParam String userId);
+}
+
+// Usage
+var repository = getIt.get<UserRepository>(param1: 'user123');
+var cachedDb = getIt.get<Database>(instanceName: 'primary');
+```
+
+**With `generateAccessors: true`:**
+
+```dart
+// Generated accessors:
+// UserRepository userRepository({required String userId}) =>
+//   get<UserRepository>(param1: userId);
+// Database database({String? instanceName}) =>
+//   get<Database>(instanceName: instanceName);
+
+// Usage
+var repository = getIt.userRepository(userId: 'user123');
+var cachedDb = getIt.database(instanceName: 'primary');
+```
+
+### Generated Extension
+
+Internally, `generateAccessors` generates accessor methods which are added to the generated `GetItInjectableX` extension:
+
+```dart
+extension GetItInjectableX on GetIt {
+  /// init method omitted for readability
+
+  UserService get userService => get<UserService>();
+  
+  Database database({String? instanceName}) =>
+    get<Database>(instanceName: instanceName);
+  
+  UserRepository userRepository({required String userId}) =>
+    get<UserRepository>(param1: userId);
+}
+```
+
+This provides IDE autocomplete support and type safety while keeping your code clean and readable.
 
 ## Registering singletons
   
@@ -164,40 +305,67 @@ GetIt provides a way to dispose singleton and lazySingleton instances by passing
 
 ```dart  
 @singleton // or lazySingleton  
-class DataSource {  
-  
-  @disposeMethod  
-  void dispose(){  
+class DataSource {
+
+  @disposeMethod
+  void dispose(){
     // logic to dispose instance  
-  }  
+  }
 }  
 ```  
 
 2- Passing a reference to a dispose function to `Singleton()` or `LazySingleton()` annotations.
 
 ```dart  
-@Singleton(dispose: disposeDataSource)  
-class DataSource {  
-  
-  void dispose() {  
+@Singleton(dispose: disposeDataSource)
+class DataSource {
+
+  void dispose() {
     // logic to dispose instance  
-  }  
-}  
+  }
+}
 /// dispose function signature must match Function(T instance)  
-FutureOr disposeDataSource(DataSource instance){  
-   instance.dispose();  
-}  
-```  
+FutureOr disposeDataSource(DataSource instance){
+  instance.dispose();
+}
+```
+
+## Multiple Registrations
+
+GetIt supports registering multiple instances of the same type without names. To enable this feature, set `allowMultipleRegistrations: true` in `@InjectableInit`:
+
+```dart
+@InjectableInit(
+  allowMultipleRegistrations: true,
+)
+void configureDependencies() => getIt.init();
+```
+
+This generates a call to `getIt.enableRegisteringMultipleInstancesOfOneType()` at the start of the init function, allowing you to register multiple implementations as the same type:
+
+```dart
+@Injectable(as: Plugin)
+class PluginA implements Plugin {}
+
+@Injectable(as: Plugin)
+class PluginB implements Plugin {}
+```
+
+Without `allowMultipleRegistrations`, the above would fail with a "type already registered" error since both classes register as `Plugin`.
+
+You can then retrieve all instances using `getIt.getAll<Plugin>()`. Note that `getIt<Plugin>()` returns only the first registered instance.
+
+**Note:** Once enabled, this setting applies globally and cannot be disabled. See [GetIt documentation](https://flutter-it.dev/documentation/get_it/multiple_registrations) for more details.
 
 ## FactoryMethod and PostConstruct Annotations
 
 As the name suggests `@FactoryMethod` annotation is used to tell injectable which method to use to create the dependency, and that includes named constructors, factory constructs and static create methods.
 
 ```dart  
-@injectable  
-class MyRepository {  
-  @factoryMethod  
-  MyRepository.from(Service s);  
+@injectable
+class MyRepository {
+  @factoryMethod
+  MyRepository.from(Service s);
 }  
 ```  
 
@@ -210,28 +378,28 @@ factory<MyRepository>(MyRepository.from(getIt<Service>()))
 or annotate static create functions or factories inside of abstract classes with `@factoryMethod`.
 
 ```dart  
-@injectable  
-abstract class Service {  
-  @factoryMethod  
-  static ServiceImpl2 create(ApiClient client) => ServiceImpl2(client);  
-  
-  @factoryMethod  
-  factory Service.from() => ServiceImpl();  
+@injectable
+abstract class Service {
+  @factoryMethod
+  static ServiceImpl2 create(ApiClient client) => ServiceImpl2(client);
+
+  @factoryMethod
+  factory Service.from() => ServiceImpl();
 }  
 ```  
 
 on the other hand `@PostConstruct` annotation is used to initialize the constructed dependency synchronously or asynchronously and that only includes public member methods.
 
 ```dart  
-@Injectable()  
-class SomeController  {  
-  SomeController(Service service);  
-  
-  @PostConstruct()  
-  void init() {  
-   //...init code  
-   }  
-  
+@Injectable()
+class SomeController  {
+  SomeController(Service service);
+
+  @PostConstruct()
+  void init() {
+    //...init code  
+  }
+
 }  
 ```  
 
@@ -242,11 +410,11 @@ now both of these annotations take an optional bool flag `preResolve`. If the cr
 Requires **GetIt >= 4.0.0** if we are to make our instance creation async we're gonna need a static initializer method since constructors can not be asynchronous.
 
 ```dart  
-class ApiClient {  
-  static Future<ApiClient> create(Deps ...) async {  
-    ....  
-    return apiClient;  
-  }  
+class ApiClient {
+  static Future<ApiClient> create(Deps ...) async {
+  ....
+  return apiClient;
+  }
 }  
 ```  
 
@@ -254,12 +422,12 @@ Now simply annotate your class with `@injectable` and tell injectable to use tha
 
 ```dart  
 @injectable // or lazy/singleton  
-class ApiClient {  
-@factoryMethod  
-  static Future<ApiClient> create(Deps ...) async {  
-    ....  
-    return apiClient;  
-  }  
+class ApiClient {
+  @factoryMethod
+  static Future<ApiClient> create(Deps ...) async {
+  ....
+  return apiClient;
+  }
 }  
 ```  
 
@@ -276,9 +444,9 @@ factoryAsync<ApiClient>(() => ApiClient.create());
 just wrap your instance with a future, and you're good to go.
 
 ```dart  
-@module  
-abstract class RegisterModule {  
-  Future<SharedPreferences> get prefs => SharedPreferences.getInstance();  
+@module
+abstract class RegisterModule {
+  Future<SharedPreferences> get prefs => SharedPreferences.getInstance();
 }  
 ```  
 
@@ -289,60 +457,60 @@ Don't forget to call `getAsync<T>()` instead of `get<T>()` when resolving an asy
 if you want to pre-await the future and register its resolved value, annotate your async dependencies with `@preResolve`.
 
 ```dart  
-@module  
-abstract class RegisterModule {  
-  @preResolve  
-  Future<SharedPreferences> get prefs => SharedPreferences.getInstance();  
+@module
+abstract class RegisterModule {
+  @preResolve
+  Future<SharedPreferences> get prefs => SharedPreferences.getInstance();
 }  
 ```  
 
 It also works with `@factoryMethod` and `@postConstruct` annotations.
 
 ```dart  
-@Injectable()  
-class AsyncService  {  
-  AsyncService(Service service);  
-  
+@Injectable()
+class AsyncService  {
+  AsyncService(Service service);
+
   // @preResolve -> this works as well  
-  @FactoryMethod(preResolve: true)  
-  static Future<AsyncService> create(@factoryParam String? param) =>  
-     Future.value(AsyncService(Service.from(param));  
-}  
+  @FactoryMethod(preResolve: true)
+  static Future<AsyncService> create(@factoryParam String? param) =>
+      Future.value(AsyncService(Service.from(param));
+      }  
 ```  
 
 ```dart  
-@Injectable()  
-class SomeController  {  
-  SomeController(Service service);  
-  
+@Injectable()
+class SomeController  {
+  SomeController(Service service);
+
   // @preResolve -> this works as well  
-  @PostConstruct(preResolve: true)  
-  Future<AsyncService> init(@factoryParam String? param) =>  
-     Future.value(SomeController(Service.from(param));  
-}  
+  @PostConstruct(preResolve: true)
+  Future<AsyncService> init(@factoryParam String? param) =>
+      Future.value(SomeController(Service.from(param));
+      }  
 ```  
 
 #### Generated Code:
 
 ```dart  
-import 'package:get_it/get_it.dart' as _i1;  
-  
-extension GetItInjectableX on _i1.GetIt {  
+import 'package:get_it/get_it.dart' as _i1;
+
+extension GetItInjectableX on _i1.GetIt {
   /// initializes the registration of main-scope dependencies inside of [GetIt]  
-  Future<_i1.GetIt> init({  
-    String? environment,  
-    _i2.EnvironmentFilter? environmentFilter,  
-  }) async {  
-    final gh = _i2.GetItHelper(  
-      this,  
-      environment,  
-      environmentFilter,  
-    );  
-    final registerModule = _$RegisterModule();  
-    final sharedPreferences = await registerModule.prefs;  
-    gh.factory<SharedPreferences>(() => sharedPreferences);  
-    return this;  
-  }  
+  Future<_i1.GetIt> init({
+    String? environment,
+    _i2.EnvironmentFilter? environmentFilter,
+  }) async {
+    final gh = _i2.GetItHelper(
+      this,
+      environment,
+      environmentFilter,
+    );
+    final registerModule = _$RegisterModule();
+    final sharedPreferences = await registerModule.prefs;
+    gh.factory<SharedPreferences>(() => sharedPreferences);
+    return this;
+  }
 }  
 ```  
 
@@ -357,18 +525,18 @@ Requires **GetIt >= 4.0.0**
 If you're working with a class you own simply annotate your changing constructor param with `@factoryParam`, you can have up to two parameters **max**!
 
 ```dart  
-@injectable  
-class BackendService {  
-  BackendService(@factoryParam String url);  
+@injectable
+class BackendService {
+  BackendService(@factoryParam String url);
 }  
 ```  
 
 #### Generated Code:
 
 ```dart  
-factoryParam<BackendService, String, dynamic>(  
-   (url, _) => BackendService(url),  
- );  
+factoryParam<BackendService, String, dynamic>(
+(url, _) => BackendService(url),
+);  
 ```  
 
 ### Using a register module (for third party dependencies)
@@ -378,17 +546,17 @@ if you declare a module member as a method instead of a simple accessor, injecta
 This is similar to how if you annotate an injected param with `@factoryParam` injectable will treat it as a factory param.
 
 ```dart  
-@module  
-abstract class RegisterModule {  
-   BackendService getService(ApiClient client, @factoryParam String url) => BackendService(client, url);  
+@module
+abstract class RegisterModule {
+  BackendService getService(ApiClient client, @factoryParam String url) => BackendService(client, url);
 }  
 ```  
 
 #### Generated Code:
 
 ```dart  
-factoryParam<BackendService, String, dynamic>(  
-     (url, _) => registerModule.getService(g<ApiClient>(), url));  
+factoryParam<BackendService, String, dynamic>(
+(url, _) => registerModule.getService(g<ApiClient>(), url));  
 ```  
 
 ## Binding abstract classes to implementations
@@ -396,17 +564,17 @@ factoryParam<BackendService, String, dynamic>(
 --- Use the 'as' Property inside of `Injectable(as:..)` to pass an abstract type that's implemented by the registered dependency
 
 ```dart  
-@Injectable(as: Service)  
-class ServiceImpl implements Service {}  
-  
+@Injectable(as: Service)
+class ServiceImpl implements Service {}
+
 // or  
-@Singleton(as: Service)  
-class ServiceImpl implements Service {}  
-  
+@Singleton(as: Service)
+class ServiceImpl implements Service {}
+
 // or  
-@LazySingleton(as: Service)  
-class ServiceImpl implements Service {}  
-  
+@LazySingleton(as: Service)
+class ServiceImpl implements Service {}
+
 ```  
 
 ###### Generated Code:
@@ -421,31 +589,31 @@ Since we can't use type binding to register more than one implementation, we hav
 to register our instances or register under different environment. (we will get to that later)
 
 ```dart
-@Named("impl1")  
-@Injectable(as: Service)  
-class ServiceImpl implements Service {}  
-  
-@Named("impl2")  
-@Injectable(as: Service)  
+@Named("impl1")
+@Injectable(as: Service)
+class ServiceImpl implements Service {}
+
+@Named("impl2")
+@Injectable(as: Service)
 class ServiceImp2 implements Service {}  
 ```  
 
 Next annotate the injected instance with `@Named()` right in the constructor and pass in the name of the desired implementation.
 
 ```dart  
-@injectable  
-class MyRepo {  
-   final Service service;  
-    MyRepo(@Named('impl1') this.service)  
+@injectable
+class MyRepo {
+  final Service service;
+  MyRepo(@Named('impl1') this.service)
 }  
 ```  
 
 ###### Generated Code:
 
 ```dart  
-factory<Service>(() => ServiceImpl1(), instanceName: 'impl1')  
-factory<Service>(() => ServiceImpl2(), instanceName: 'impl2')  
-  
+factory<Service>(() => ServiceImpl1(), instanceName: 'impl1')
+factory<Service>(() => ServiceImpl2(), instanceName: 'impl2')
+
 factory<MyRepo>(() => MyRepo(getIt('impl1'))  
 ```  
 
@@ -454,21 +622,21 @@ factory<MyRepo>(() => MyRepo(getIt('impl1'))
 Use the lower cased `@named` annotation to automatically assign the implementation class name to the instance name. Then use `@Named.from(Type)` annotation to extract the name from the type.
 
 ```dart  
-@named  
-@Injectable(as: Service)  
- class ServiceImpl1 implements Service {}  
-  
-@injectable  
-class MyRepo {  
-   final Service service;  
-    MyRepo(@Named.from(ServiceImpl1) this.service)  
+@named
+@Injectable(as: Service)
+class ServiceImpl1 implements Service {}
+
+@injectable
+class MyRepo {
+  final Service service;
+  MyRepo(@Named.from(ServiceImpl1) this.service)
 }  
 ```  
 
 ###### Generated Code:
 
 ```dart  
-factory<Service>(() => ServiceImpl1(), instanceName: 'ServiceImpl1')  
+factory<Service>(() => ServiceImpl1(), instanceName: 'ServiceImpl1')
 factory<MyRepo>(() => MyRepo(getIt('ServiceImpl1'))  
 ```  
 
@@ -479,34 +647,34 @@ factory<MyRepo>(() => MyRepo(getIt('ServiceImpl1'))
 it is possible to register different dependencies for different environments by using `@Environment('name')` annotation. in the below example ServiceA is now only registered if we pass the environment name to `$init(environment: 'dev')`.
 
 ```dart  
-@Environment("dev")  
-@injectable  
+@Environment("dev")
+@injectable
 class ServiceA {}  
 ```  
 
 you could also create your own environment annotations by assigning the const constructor `Environment("")` to a global const var.
 
 ```dart  
-const dev = Environment('dev');  
+const dev = Environment('dev');
 // then just use it to annotate your classes  
-@dev  
-@injectable  
+@dev
+@injectable
 class ServiceA {}  
 ```  
 
 You can assign multiple environment names to the same class.
 
 ```dart  
-@test  
-@dev  
-@injectable  
+@test
+@dev
+@injectable
 class ServiceA {}  
 ```  
 
 Alternatively use the env property in injectable and subs to assign environment names to your dependencies.
 
 ```dart  
-@Injectable(as: Service, env: [Environment.dev, Environment.test])  
+@Injectable(as: Service, env: [Environment.dev, Environment.test])
 class RealServiceImpl implements Service {}  
 ```  
 
@@ -524,14 +692,14 @@ Alternatively, you can pass your own `EnvironmentFilter` to decide what dependen
 To Register third party types, create an abstract class and annotate it with `@module` then add your third party types as property accessors or methods as follows:
 
 ```dart  
-@module  
-abstract class RegisterModule {  
-  @singleton  
-  ThirdPartyType get thirdPartyType;  
-  
-  @prod  
-  @Injectable(as: ThirdPartyAbstract)  
-  ThirdPartyImpl get thirdPartyType;  
+@module
+abstract class RegisterModule {
+  @singleton
+  ThirdPartyType get thirdPartyType;
+
+  @prod
+  @Injectable(as: ThirdPartyAbstract)
+  ThirdPartyImpl get thirdPartyType;
 }  
 ```  
 
@@ -540,22 +708,22 @@ abstract class RegisterModule {
 In some cases you'd need to register instances that are asynchronous or singleton instances or just have a custom initializer and that's a bit hard for injectable to figure out on its own, so you need to tell injectable how to initialize them:
 
 ```dart  
-@module  
-abstract class RegisterModule {  
- // You can register named preemptive types like follows  
-  @Named("BaseUrl")  
-  String get baseUrl => 'My base url';  
-  
+@module
+abstract class RegisterModule {
+  // You can register named preemptive types like follows  
+  @Named("BaseUrl")
+  String get baseUrl => 'My base url';
+
   // url here will be injected  
-  @lazySingleton  
-  Dio dio(@Named('BaseUrl') String url) => Dio(BaseOptions(baseUrl: url));  
-  
+  @lazySingleton
+  Dio dio(@Named('BaseUrl') String url) => Dio(BaseOptions(baseUrl: url));
+
   // same thing works for instances that's gotten asynchronous.  
   // all you need to do is wrap your instance with a future and tell injectable how  
   // to initialize it  
   @preResolve // if you need to pre resolve the value  
-  Future<SharedPreferences> get prefs => SharedPreferences.getInstance();  
-  // Also, make sure you await for your configure function before running the App.  
+  Future<SharedPreferences> get prefs => SharedPreferences.getInstance();
+// Also, make sure you await for your configure function before running the App.  
 }  
 ```  
 
@@ -573,17 +741,17 @@ class_name_pattern: 'Service$|Repository$|Bloc\$'
 To use auto-register create a file with the name **build.yaml** in the same directory as **pubspec.yaml** and add
 
 ```yaml  
-targets:  
-  $default:  
-    builders:  
-      injectable_generator:injectable_builder:  
-        options:  
-          auto_register: true  
+targets:
+  $default:
+    builders:
+      injectable_generator:injectable_builder:
+        options:
+          auto_register: true
           # auto registers any class with a name matches the given pattern  
-          class_name_pattern:  
-            "Service$|Repository$|Bloc$"  
+          class_name_pattern:
+            "Service$|Repository$|Bloc$"
             # auto registers any class inside a file with a  
-            # name matches the given pattern  
+          # name matches the given pattern  
           file_name_pattern: "_service$|_repository$|_bloc$"  
 ```  
 
@@ -598,7 +766,7 @@ You specify the custom order by using annotation `@Order(number)` or using the p
 
 ```dart  
 // @Order(-1) this works too  
-@Injectable(order: -1)  
+@Injectable(order: -1)
 class Service{}  
 ```  
 
@@ -613,7 +781,7 @@ e.g.
 
 ```dart  
 // @Scope('auth') this works too  
-@Injectable(scope: 'auth')  
+@Injectable(scope: 'auth')
 class AuthController{}  
 ```  
 
@@ -621,14 +789,14 @@ when you're ready to use the auth-scope, call the generated scope-init method or
 
 ```dart  
  // using extensions  
- getIt.initAuthScope();  
- // using methods  
- initAuthScope(getIt);  
-  
- // scope-init method will return future if it has pre-resolved dependencies  
- // so make sure you await it  
- await getIt.initAuthScope();  
-  
+getIt.initAuthScope();
+// using methods  
+initAuthScope(getIt);
+
+// scope-init method will return future if it has pre-resolved dependencies  
+// so make sure you await it  
+await getIt.initAuthScope();
+
 ```  
 
 ## Including microPackages and external modules
@@ -638,19 +806,19 @@ so all you have to do is annotate the package as a microPackage by using the nam
 
 ```dart  
 // @microPackageInit => short const  
-@InjectableInit.microPackage()  
+@InjectableInit.microPackage()
 initMicroPackage(){} // will not be called but needed for code generation  
 ```  
 
 #### Generated Code:
 
 ```dart  
-class AwesomePackageModule extends MicroPackageModule {  
-  @override  
-   FutureOr<void> init(_i1.GetItHelper gh) {  
-     gh.factory<Dep>(() => Dep());  
-     gh.factory<Calculator>(() => Calculator(gh<Dep>()));  
- }}  
+class AwesomePackageModule extends MicroPackageModule {
+  @override
+  FutureOr<void> init(_i1.GetItHelper gh) {
+    gh.factory<Dep>(() => Dep());
+    gh.factory<Calculator>(() => Calculator(gh<Dep>()));
+  }}  
 ```  
 
 By default injectable will automatically include all `MicroPackagesModules` in the project directory unless the `includeMicroPackages` flag inside of `@InjectableInit` is set to false.
@@ -665,24 +833,24 @@ Modules assigned to externalPackageModulesBefore will be initialized before the 
 Modules assigned to externalPackageModulesAfter will be initialized after the root dependencies;
 
 ```dart  
-@InjectableInit(  
-  externalPackageModulesBefore: [  
-  ExternalModule(AwesomePackageModule),  
-  ExternalModule(ThirdPartyMicroModule),  
- ],  
- externalPackageModulesAfter: [  
-  ExternalModule(CoolPackageModule),  
- ],)  
+@InjectableInit(
+  externalPackageModulesBefore: [
+    ExternalModule(AwesomePackageModule),
+    ExternalModule(ThirdPartyMicroModule),
+  ],
+  externalPackageModulesAfter: [
+    ExternalModule(CoolPackageModule),
+  ],)
 void configureDependencies() {}
 ```  
 
 #### Initializing modules inside of scopes
 External Modules can be initialized inside of specific scopes by simply assigning a scope to `ExternalModule`.
 ```dart
-@InjectableInit(  
-  externalPackageModulesBefore: [  
-	  ExternalModule(AwesomePackageModule, scope: 'awesome'),  
- ], )  
+@InjectableInit(
+  externalPackageModulesBefore: [
+    ExternalModule(AwesomePackageModule, scope: 'awesome'),
+  ], )
 void configureDependencies() {}
 ```
 

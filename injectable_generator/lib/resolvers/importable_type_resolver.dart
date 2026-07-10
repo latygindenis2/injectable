@@ -3,17 +3,24 @@ import 'package:analyzer/dart/element/nullability_suffix.dart';
 import 'package:analyzer/dart/element/type.dart';
 import 'package:collection/collection.dart';
 import 'package:injectable_generator/models/importable_type.dart';
-import 'package:injectable_generator/utils.dart';
+import 'package:injectable_generator/resolvers/utils.dart';
 import 'package:path/path.dart' as p;
 
+/// A resolver for determining the import paths and type information for Dart types.
 abstract class ImportableTypeResolver {
+  /// Resolves the import paths for the given element.
   Set<String> resolveImports(Element element);
 
+  /// Resolves a [DartType] to an [ImportableType].
   ImportableType resolveType(DartType type);
 
-  ImportableType resolveFunctionType(FunctionType function,
-      [ExecutableElement? executableElement]);
+  /// Resolves a function type to an [ImportableType].
+  ImportableType resolveFunctionType(
+    FunctionType function, [
+    ExecutableElement? executableElement,
+  ]);
 
+  /// Returns the relative path from [to] to [path], or null if not applicable.
   static String? relative(String? path, Uri? to) {
     if (path == null || to == null) {
       return null;
@@ -36,6 +43,7 @@ abstract class ImportableTypeResolver {
     }
   }
 
+  /// Converts an asset URI to a package URI string.
   static String? resolveAssetImport(String? path) {
     if (path == null) {
       return null;
@@ -48,35 +56,42 @@ abstract class ImportableTypeResolver {
   }
 }
 
+/// Implementation of [ImportableTypeResolver] using the analyzer package.
 class ImportableTypeResolverImpl extends ImportableTypeResolver {
+  /// The library elements to search for element imports.
   final List<LibraryElement> libs;
 
+  /// Creates an [ImportableTypeResolverImpl] with the given libraries.
   ImportableTypeResolverImpl(this.libs);
 
   @override
   Set<String> resolveImports(Element? element) {
     final imports = <String>{};
     // return early if source is null or element is a core type
-    if (element?.source == null || _isCoreDartType(element)) {
+    if (element?.firstFragment.libraryFragment == null ||
+        _isCoreDartType(element)) {
       return imports;
     }
-    libs.where((e) => e.exportNamespace.definedNames.values.contains(element));
+    libs.where((e) => e.exportNamespace.definedNames2.values.contains(element));
     for (var lib in libs) {
       if (!_isCoreDartType(lib) &&
-          lib.exportNamespace.definedNames.values.contains(element)) {
-        imports.add(lib.identifier);
+          lib.exportNamespace.definedNames2.values.contains(element)) {
+        imports.add(lib.uri.toString());
       }
     }
     return imports;
   }
 
   bool _isCoreDartType(Element? element) {
-    return element?.source?.fullName == 'dart:core';
+    return element?.firstFragment.libraryFragment?.source.fullName ==
+        'dart:core';
   }
 
   @override
-  ImportableType resolveFunctionType(FunctionType function,
-      [ExecutableElement? executableElement]) {
+  ImportableType resolveFunctionType(
+    FunctionType function, [
+    ExecutableElement? executableElement,
+  ]) {
     final functionElement =
         executableElement ?? function.element ?? function.alias?.element;
     if (functionElement == null) {
@@ -86,7 +101,7 @@ class ImportableTypeResolverImpl extends ImportableTypeResolver {
     var functionName = displayName;
 
     Element elementToImport = functionElement;
-    var enclosingElement = functionElement.enclosingElement3;
+    var enclosingElement = functionElement.enclosingElement;
 
     if (enclosingElement != null && enclosingElement is ClassElement) {
       functionName = '${enclosingElement.displayName}.$displayName';
@@ -106,47 +121,56 @@ class ImportableTypeResolverImpl extends ImportableTypeResolver {
     if (typeToCheck is RecordType && typeToCheck.alias == null) {
       for (final recordField in [
         ...typeToCheck.positionalFields,
-        ...typeToCheck.namedFields
+        ...typeToCheck.namedFields,
       ]) {
         final imports = resolveImports(recordField.type.element);
-        importableTypes.add(ImportableType(
-          name: recordField.type.element?.name ?? 'void',
-          import: imports.firstOrNull,
-          otherImports: imports.skip(1).toSet(),
-          isNullable:
-              recordField.type.nullabilitySuffix == NullabilitySuffix.question,
-          typeArguments: _resolveTypeArguments(recordField.type),
-          nameInRecord:
-              recordField is RecordTypeNamedField ? recordField.name : null,
-        ));
+        importableTypes.add(
+          ImportableType(
+            name: recordField.type.element?.displayName ?? 'void',
+            import: imports.firstOrNull,
+            otherImports: imports.skip(1).toSet(),
+            isNullable:
+                recordField.type.nullabilitySuffix ==
+                NullabilitySuffix.question,
+            typeArguments: _resolveTypeArguments(recordField.type),
+            nameInRecord: recordField is RecordTypeNamedField
+                ? recordField.name
+                : null,
+          ),
+        );
       }
     } else if (typeToCheck is ParameterizedType || typeToCheck.alias != null) {
       final typeArguments = [
         if (typeToCheck.alias != null)
           ...typeToCheck.alias!.typeArguments
         else if (typeToCheck is ParameterizedType)
-          ...typeToCheck.typeArguments
+          ...typeToCheck.typeArguments,
       ];
       for (DartType type in typeArguments) {
         final imports = resolveImports(type.element);
         if (type is RecordType) {
-          importableTypes.add(ImportableType.record(
-            name: type.element?.name ?? '',
-            import: imports.firstOrNull,
-            otherImports: imports.skip(1).toSet(),
-            isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
-            typeArguments: _resolveTypeArguments(type),
-          ));
+          final effectiveElement = type.alias?.element ?? type.element;
+          importableTypes.add(
+            ImportableType.record(
+              name: effectiveElement?.displayName ?? '',
+              import: imports.firstOrNull,
+              otherImports: imports.skip(1).toSet(),
+              isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+              typeArguments: _resolveTypeArguments(type),
+            ),
+          );
         } else if (type.element is TypeParameterElement) {
           importableTypes.add(ImportableType(name: 'dynamic'));
         } else {
-          importableTypes.add(ImportableType(
-            name: type.element?.name ?? type.nameWithoutSuffix,
-            import: imports.firstOrNull,
-            otherImports: imports.skip(1).toSet(),
-            isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
-            typeArguments: _resolveTypeArguments(type),
-          ));
+          importableTypes.add(
+            ImportableType(
+              name: type.element?.displayName ?? type.nameWithoutSuffix,
+              import: imports.firstOrNull,
+              otherImports: imports.skip(1).toSet(),
+              isNullable: type.nullabilitySuffix == NullabilitySuffix.question,
+              typeArguments: _resolveTypeArguments(type),
+            ),
+          );
         }
       }
     }

@@ -36,35 +36,19 @@ class AsyncService extends AbstractService {
   @override
   final Set<String> environments;
 
-  AsyncService(
-    @Named(kEnvironmentsName) this.environments,
-  );
+  AsyncService(@Named(kEnvironmentsName) this.environments);
 
   @FactoryMethod(preResolve: true)
   static Future<AsyncService> create(
     @Named(kEnvironmentsName) Set<String> envs,
-  ) =>
-      Future.value(AsyncService(envs));
+  ) => Future.value(AsyncService(envs));
 }
 
 abstract class IService {}
 
-@named
-@dev
 @Injectable(as: IService)
 class ServiceImpl extends IService {
-  ServiceImpl(@factoryParam String? param);
-}
-
-@test
-@Injectable(as: IService)
-class LazyServiceImpl extends IService {
-  LazyServiceImpl._(String? param);
-
-  @factoryMethod
-  static Future<IService> create(@factoryParam String? param) {
-    return Future.value(LazyServiceImpl._(param));
-  }
+  ServiceImpl();
 }
 
 @singleton
@@ -82,11 +66,42 @@ class PostConstructableService {
 
 sealed class Model {
   Model get m {
-    return switch (this) { ModelX() => ModelX(), ModelY() => ModelY() };
+    return switch (this) {
+      ModelX() => ModelX(),
+      ModelY() => ModelY(),
+    };
   }
 }
 
-@Injectable(as: Model)
+@Injectable(as: Model, cache: true)
 class ModelX extends Model {}
 
 class ModelY extends Model {}
+
+/// Example of a service that accepts factory parameters
+@injectable
+class ConfigurableService {
+  final String apiKey;
+  final String baseUrl;
+
+  ConfigurableService({
+    @factoryParam required this.apiKey,
+    @factoryParam required this.baseUrl,
+  });
+
+  @override
+  String toString() =>
+      'ConfigurableService(apiKey: $apiKey, baseUrl: $baseUrl)';
+}
+
+/// Example of a service with a single parameter
+@injectable
+class LoggerService {
+  final String name;
+
+  LoggerService(@factoryParam this.name);
+
+  void log(String message) {
+    print('[$name] $message');
+  }
+}

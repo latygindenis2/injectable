@@ -1,4 +1,41 @@
 # ChangeLog
+## [3.1.0]
+- Fix: avoid import alias collisions in HashedAllocator (#544) by @kmslab20
+- Feat: support private named parameters by @jkoenig134
+- Chore: update Dart SDK constraint to ">=3.12.0 <4.0.0"
+- Chore: update analyzer constraint to ">=10.0.0 <14.0.0"
+## [3.0.2]
+- Fix: update lean_builder to 0.1.9 to sync analyzer version
+## [3.0.1]
+- Fix: update lean_builder to 0.1.9 to sync analyzer version
+## [3.0.0]
+- Breaking: Removed `includeMicroPackages` option. Micro packages must now be explicitly registered using `externalPackageModulesBefore` and `externalPackageModulesAfter` in `@InjectableInit`.
+- Breaking: Removed deprecated `usesNullSafety` option. Null safety is now always assumed.
+- Feat: Add support for multiple registrations via `allowMultipleRegistrations` (#535, #531).
+- Fix: Treat external dependencies as non-blocking in environment sorting (#539, Fixes #532).
+## [2.12.1]
+- Chore: Update analyzer constrains to ">=9.0.0 <11.0.0"
+## [2.12.0]
+- Feat: Add optional support for lean_builder package for blazing fast builds
+## [2.11.1]
+- Feat: Add support for `generateAccessors` option to generate GetIt extension getters
+- Feat: Improve dependency sorting logic for more predictable registration order
+- Feat: Add comprehensive test coverage
+- Chore: Update injectable dependency to ^2.7.2
+## [2.11.0]
+- Feat: Add support to cached factories introduced in get_it 8.0.0
+## [2.10.0]
+- Chore: Update dependencies, analyzer (v9), glob (v2.1.3), code_builder (v4.11.0), dart_style (v3.1.3)
+
+## [2.9.0]
+- Chore: Update dependencies, source_gen (v4), build (v4), analyzer (v8)
+- Update dart constrains to ">=3.8.0 <4.0.0"
+## [2.8.1]
+- Fix: Fix @factoryMethod for factory class constructor
+## [2.8.0]
+- Chore: Update dependencies, source_gen (v3), build (v3), build_runner (v2.6)
+- Feat: Add generateForEnvironments option
+- Fix: fex dependency sort when dependencies have multiple environments
 ## [2.7.0]
 - Chore: Update dependencies, source_gen (v2), analyzer (<8.0.0), dart_style (v3)
 ## [2.6.2]
@@ -45,7 +82,7 @@ Fix: Type Alias error on generation #437
 ## [2.1.0]
 - Add support for micro package modules order [before,after]
 - Add support for micro package modules scopes
-## [2.0.1] 
+## [2.0.1]
 - Fix registration order #324
 ## [2.0.0] [Minor breaking changes]
 - Add support for micro packages
@@ -70,12 +107,12 @@ Fix yet another registration order issue #244
 Fix auto-async factory bug #237
 Fix passing dispose function throws #240
 Fix initialization order doesn't respect environments #238
-Add generator prints warning when an injected dependency is not available under the same environment 
+Add generator prints warning when an injected dependency is not available under the same environment
 ## [1.5.0]
 Use getAsync for async injected dependencies, fixes #230
 Add support for function factory params, fixes #224
 Update analyzer version #228
-Add ignore types in packages support 
+Add ignore types in packages support
 Fix some readme typos
 ## [1.4.1]
 - Bump up build_runner version to 2.0.3
@@ -85,13 +122,13 @@ Fix some readme typos
 - Bump up build_runner version to 2.0.2
 ## [1.3.0]
 - Include merge that fixes #194
-- Bump up versions of build_runner -> 2.0.1, code_builder -> 4.0.0, analyzer -> 1.5.0 
+- Bump up versions of build_runner -> 2.0.1, code_builder -> 4.0.0, analyzer -> 1.5.0
 ## [1.2.2]
 - Fix generator crash after 1.2.1 update
 - Add option to ignore missing type warning for specified types
 ## [1.2.1]
 - Bump up versions of build, build_runner, dart_style and source_gen
-- Fix named instances are ignored when sorting dependencies. 
+- Fix named instances are ignored when sorting dependencies.
 - Clean up some code
 ## [1.2.0]
 - push nullSafety version to the main section
